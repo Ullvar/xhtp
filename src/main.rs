@@ -28,7 +28,16 @@ fn read_http_request_file() -> Vec<structs::HttpRequest> {
 fn save_to_global_variables(key: String, value: String) {
     let mut global_variables = utils::get_global_variables();
     let global_variable = structs::GlobalVariable { key, value };
-    global_variables.push(global_variable);
+
+    if let Some(index) = global_variables
+        .iter()
+        .position(|x| x.key == global_variable.key)
+    {
+        global_variables[index] = global_variable;
+    } else {
+        global_variables.push(global_variable);
+    }
+
     let mut file = File::create(utils::get_global_variables_file_path()).unwrap();
     let json = serde_json::to_string(&global_variables).unwrap();
     file.write_all(json.as_bytes()).unwrap();
