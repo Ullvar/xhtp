@@ -5,9 +5,13 @@ use std::io::BufReader;
 use std::io::Write;
 mod structs;
 mod utils;
+use std::fs;
 
 fn read_http_request_file() -> Vec<structs::HttpRequest> {
     if !File::open(utils::get_http_requests_file_path()).is_ok() {
+        if let Err(err) = fs::create_dir(format!("{}/.xhtp", utils::get_home_path())) {
+            eprintln!("Error creating directory: {}", err);
+        }
         // File does not exist, create it
         let mut file =
             File::create(utils::get_http_requests_file_path()).expect("Failed to create file");
