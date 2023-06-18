@@ -7,13 +7,14 @@ mod structs;
 mod utils;
 
 fn read_http_request_file() -> Vec<structs::HttpRequest> {
-    if !File::open("requests.json").is_ok() {
+    if !File::open(utils::get_http_requests_file_path()).is_ok() {
         // File does not exist, create it
-        let mut file = File::create("requests.json").expect("Failed to create file");
+        let mut file =
+            File::create(utils::get_http_requests_file_path()).expect("Failed to create file");
         file.write_all("[]".as_bytes())
             .expect("Failed to create file");
     }
-    let file = File::open("requests.json").expect("Failed to open file");
+    let file = File::open(utils::get_http_requests_file_path()).expect("Failed to open file");
     let reader = BufReader::new(file);
     let requests: Vec<structs::HttpRequest> =
         serde_json::from_reader(reader).expect("Failed to parse JSON");
@@ -24,7 +25,7 @@ fn save_to_global_variables(key: String, value: String) {
     let mut global_variables = utils::get_global_variables();
     let global_variable = structs::GlobalVariable { key, value };
     global_variables.push(global_variable);
-    let mut file = File::create("global_variables.json").unwrap();
+    let mut file = File::create(utils::get_global_variables_file_path()).unwrap();
     let json = serde_json::to_string(&global_variables).unwrap();
     file.write_all(json.as_bytes()).unwrap();
 }

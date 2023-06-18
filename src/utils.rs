@@ -1,7 +1,23 @@
 use crate::structs::{ExtractVariable, GlobalVariable, HttpRequest};
+use dirs::home_dir;
 use serde_json::Value;
 use std::fs::File;
 use std::io::{BufReader, Write};
+
+pub fn get_home_path() -> String {
+    if let Some(path) = home_dir() {
+        return path.to_str().unwrap().to_string();
+    }
+    return "".to_string();
+}
+
+pub fn get_http_requests_file_path() -> String {
+    format!("{}/.xhtp/requests.json", get_home_path())
+}
+
+pub fn get_global_variables_file_path() -> String {
+    format!("{}/.xhtp/global_variables.json", get_home_path())
+}
 
 pub fn print_line(text: &str) {
     println!("\x1b[94m{}\x1b[0m", text);
@@ -199,7 +215,7 @@ pub fn handle_add(requests: &mut Vec<HttpRequest>) {
 
     requests.push(request);
 
-    let mut file = File::create("requests.json").unwrap();
+    let mut file = File::create(get_http_requests_file_path()).unwrap();
 
     let json = serde_json::to_string(&requests).unwrap();
 
@@ -222,7 +238,7 @@ pub fn handle_delete(requests: &mut Vec<HttpRequest>) -> Result<(), Box<dyn std:
 
     let json = serde_json::to_string(&requests)?;
 
-    let mut file = File::create("requests.json")?;
+    let mut file = File::create(get_http_requests_file_path())?;
     file.write_all(json.as_bytes())?;
 
     return Ok(());
@@ -240,13 +256,14 @@ pub fn get_json_value<'a>(json: &'a Value, key: &str) -> Option<&'a Value> {
 }
 
 pub fn get_global_variables() -> Vec<GlobalVariable> {
-    if !File::open("global_variables.json").is_ok() {
+    if !File::open(get_global_variables_file_path()).is_ok() {
         // File does not exist, create it
-        let mut file = File::create("global_variables.json").expect("Failed to create file");
+        let mut file =
+            File::create(get_global_variables_file_path()).expect("Failed to create file");
         file.write_all("[]".as_bytes())
             .expect("Failed to create file");
     }
-    let file = File::open("global_variables.json").expect("Failed to open file");
+    let file = File::open(get_global_variables_file_path()).expect("Failed to open file");
     let reader = BufReader::new(file);
     let global_variables: Vec<GlobalVariable> =
         serde_json::from_reader(reader).expect("Failed to parse JSON");
@@ -272,7 +289,7 @@ fn add_global_variable() -> Result<(), Box<dyn std::error::Error>> {
 
     let json = serde_json::to_string(&global_variables)?;
 
-    let mut file = File::create("global_variables.json")?;
+    let mut file = File::create(get_global_variables_file_path())?;
     file.write_all(json.as_bytes())?;
 
     return Ok(());
@@ -291,7 +308,7 @@ fn delete_global_variable() -> Result<(), Box<dyn std::error::Error>> {
 
     let json = serde_json::to_string(&global_variables)?;
 
-    let mut file = File::create("global_variables.json")?;
+    let mut file = File::create(get_global_variables_file_path())?;
     file.write_all(json.as_bytes())?;
 
     return Ok(());
