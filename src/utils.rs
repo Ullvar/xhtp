@@ -354,7 +354,6 @@ pub fn handle_global_variables() -> Result<(), reqwest::Error> {
             return Ok(());
         }
     } else {
-        print_line("Invalid choice!");
         return Ok(());
     }
 }
