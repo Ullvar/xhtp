@@ -1,113 +1,138 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
-
 use clap::Parser;
 use serde_json::Value;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Write;
+mod structs;
+mod utils;
 
-#[derive(Parser)]
-struct Cli {
-    first_arg: Option<String>,
-}
-
-fn read_file(path: &str) -> Vec<String> {
-    let file = File::open(path).expect("file not found");
+fn read_http_request_file() -> Vec<structs::HttpRequest> {
+    if !File::open("requests.json").is_ok() {
+        // File does not exist, create it
+        let mut file = File::create("requests.json").expect("Failed to create file");
+        file.write_all("[]".as_bytes())
+            .expect("Failed to create file");
+    }
+    let file = File::open("requests.json").expect("Failed to open file");
     let reader = BufReader::new(file);
-    let mut lines = Vec::new();
-    for line in reader.lines() {
-        lines.push(line.unwrap());
-    }
-    lines
+    let requests: Vec<structs::HttpRequest> =
+        serde_json::from_reader(reader).expect("Failed to parse JSON");
+    requests
 }
 
-fn get_url_with_https(url: &str) -> String {
-    if url.starts_with("http") {
-        return url.to_string();
+fn save_to_global_variables(key: String, value: String) {
+    let mut global_variables = utils::get_global_variables();
+    let global_variable = structs::GlobalVariable { key, value };
+    global_variables.push(global_variable);
+    let mut file = File::create("global_variables.json").unwrap();
+    let json = serde_json::to_string(&global_variables).unwrap();
+    file.write_all(json.as_bytes()).unwrap();
+}
+
+async fn handle_response(
+    req: &structs::HttpRequest,
+    res: reqwest::Response,
+) -> Result<(), reqwest::Error> {
+    println!("{}", res.status());
+
+    let content_type = utils::get_content_type_from_header(res.headers());
+
+    if content_type == "application/json" {
+        let res_text = res.text().await?;
+        let json: Value = serde_json::from_str(&res_text).unwrap();
+
+        if req.extract_variables.is_some() {
+            let extract_variables = req.extract_variables.as_ref().unwrap();
+            for variable in extract_variables {
+                if let Some(value) = utils::get_json_value(&json, &variable.key_path) {
+                    save_to_global_variables(variable.variable_name.clone(), value.to_string());
+                } else {
+                    println!(
+                        "The key '{}' was not found in the JSON.",
+                        &variable.key_path
+                    );
+                }
+            }
+        }
+
+        println!("{:#}", json);
     } else {
-        return format!("https://{}", url);
+        println!("{}", res.text().await?);
     }
+
+    Ok(())
 }
 
-fn get_content_type_from_header(headers: &reqwest::header::HeaderMap) -> String {
-    let content_type = headers.get("content-type").unwrap();
-    let content_type = content_type.to_str().unwrap();
-    let content_type = content_type.split(";").collect::<Vec<&str>>();
-    content_type[0].to_string()
-}
-
-fn arg_is_number(option: &str) -> bool {
-    option.parse::<i32>().is_ok()
-}
-
-fn convert_option_to_number(option: &str) -> usize {
-    option.parse::<usize>().unwrap()
-}
-
-fn get_url_from_saved_requests(saved_requests: &Vec<String>, index: usize) -> String {
-    let url = &saved_requests[index - 1];
-    let url = url.split(" ").collect::<Vec<&str>>();
-    url[1].to_string()
-}
-
-fn print_saved_requests(saved_requests: &Vec<String>) {
-    for (index, line) in saved_requests.iter().enumerate() {
-        println!("{}: {}", index + 1, line);
+fn get_headers_from_vec(headers: &Vec<String>) -> reqwest::header::HeaderMap {
+    let mut header_map = reqwest::header::HeaderMap::new();
+    for header in headers {
+        let header_split: Vec<&str> = header.split(":").collect();
+        let header_name = header_split[0];
+        let header_value = header_split[1];
+        header_map.insert(
+            reqwest::header::HeaderName::from_bytes(header_name.as_bytes()).unwrap(),
+            reqwest::header::HeaderValue::from_str(header_value).unwrap(),
+        );
     }
-}
-fn handle_add() {
-    print!("Enter the http request method: ");
-    std::io::stdout().flush().unwrap();
-    let mut method = String::new();
-    std::io::stdin().read_line(&mut method).unwrap();
-    method = method.trim().to_string();
-
-    print!("Enter the url: ");
-    std::io::stdout().flush().unwrap();
-    let mut url = String::new();
-    std::io::stdin().read_line(&mut url).unwrap();
-    url = url.trim().to_string();
-
-    let full_request = format!("{} {}\n", method.to_uppercase(), url);
-    println!("Saving request...");
-    let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .open("saved_requests.txt")
-        .unwrap();
-    file.write_all(full_request.as_bytes()).unwrap();
+    header_map
 }
 
-fn handle_delete(saved_requests: &mut Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-    print_saved_requests(&saved_requests);
-    print!("Select the number of the request you want to delete: ");
-    std::io::stdout().flush().unwrap();
-    let mut number = String::new();
-    std::io::stdin().read_line(&mut number).unwrap();
-    number = number.trim().to_string();
+async fn make_request(request: &structs::HttpRequest) -> Result<(), reqwest::Error> {
+    let global_variables = utils::get_global_variables();
+    let mut partial_url = request.url.clone();
+    let mut headers = request.headers.clone();
 
-    let index = convert_option_to_number(&number);
-    if index > saved_requests.len() {
-        return Err("The number you passed is too big!".into());
+    for global_variable in global_variables {
+        let key = format!("{{{{{}}}}}", global_variable.key);
+        let value = global_variable.value;
+        partial_url = partial_url.replace(&key, &value);
+        for header in &mut headers {
+            *header = header.replace(&key, &value);
+        }
     }
-    saved_requests.remove(index - 1);
-    let mut new_file = File::create("saved_requests.txt").unwrap();
-    for line in saved_requests {
-        let new_line = format!("{}\n", line);
-        new_file.write_all(new_line.as_bytes()).unwrap();
-    }
-    return Ok(());
-}
 
-fn too_big(saved_requests: &Vec<String>) -> Result<(), reqwest::Error> {
-        println!("The number you passed is too big!");
-        println!("Here are your available options:");
-        print_saved_requests(&saved_requests);
-        return Ok(());
+    let full_url = utils::get_url_with_https(&partial_url);
+
+    if request.method == "GET" {
+        let response = reqwest::Client::new()
+            .get(&full_url)
+            .headers(get_headers_from_vec(&headers))
+            .send()
+            .await?;
+        handle_response(request, response).await?;
+    } else if request.method == "POST" {
+        let response = reqwest::Client::new()
+            .post(&full_url)
+            .headers(get_headers_from_vec(&headers))
+            .json(&request.body)
+            .send()
+            .await?;
+        handle_response(request, response).await?;
+    } else if request.method == "PUT" {
+        let response = reqwest::Client::new()
+            .put(&full_url)
+            .headers(get_headers_from_vec(&headers))
+            .json(&request.body)
+            .send()
+            .await?;
+        handle_response(request, response).await?;
+    } else if request.method == "DELETE" {
+        let response = reqwest::Client::new()
+            .delete(&full_url)
+            .headers(get_headers_from_vec(&headers))
+            .send()
+            .await?;
+        handle_response(request, response).await?;
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
-    let mut saved_requests = read_file("saved_requests.txt");
+    let mut requests = read_http_request_file();
 
-    let args = Cli::parse();
+    let args = structs::Cli::parse();
 
     let help_text = Some("help".to_string());
     let help_text2 = Some("h".to_string());
@@ -117,13 +142,16 @@ async fn main() -> Result<(), reqwest::Error> {
         || args.first_arg == help_text2
         || args.first_arg == Some("".to_string())
     {
-        println!(
+        utils::print_line(
             "
         Usage: 
         Do a simple GET request by passing a url as an argument, alternatively you can select one of the following options:
-            list - list all the urls in the config file
-            add - add a new url to the config file
-            delete - delete a url from the config file
+            list/l - list all the urls in the config file
+            list/l (request number) - list all the details of a specific request 
+            add/a - add a new url to the config file
+            edit/e - edit a url in the config file
+            delete/d - delete a url from the config file
+            global/g - manage all the global variables
             help/h - show help
         "
         );
@@ -131,46 +159,56 @@ async fn main() -> Result<(), reqwest::Error> {
     }
 
     let first_arg = args.first_arg.as_ref().unwrap();
+    let second_arg = args.second_arg.as_ref();
 
-    if first_arg == "list" {
-        println!("Pass the number of the request you want to use as an argument.");
-        print_saved_requests(&saved_requests);
+    if first_arg == "list" || first_arg == "l" {
+        if second_arg.is_some() && utils::arg_is_number(&second_arg.as_ref().unwrap()) {
+            let index = second_arg.as_ref().unwrap().parse::<usize>().unwrap();
+            utils::print_full_saved_request_from_index(&requests, index)
+        } else {
+            utils::print_line("Pass the number of the request you want to use as an argument.");
+            utils::print_saved_requests(&requests);
+        }
         return Ok(());
-    } else if first_arg == "add" {
-        handle_add();
+    } else if first_arg == "add" || first_arg == "a" {
+        utils::handle_add(&mut requests);
         return Ok(());
-    } else if first_arg == "delete" {
-        let result = handle_delete(&mut saved_requests);
+    } else if first_arg == "delete" || first_arg == "d" {
+        let result = utils::handle_delete(&mut requests);
         if result.is_err() {
-            return too_big(&saved_requests);
+            return utils::too_big(&requests);
         }
         return Ok(());
+    } else if first_arg == "edit" || first_arg == "e" {
+        return Ok(());
+    } else if first_arg == "global" || first_arg == "g" {
+        return utils::handle_global_variables();
     }
 
-    let mut full_url = get_url_with_https(&first_arg);
-
-    if arg_is_number(&first_arg) {
-        let index = convert_option_to_number(&first_arg);
-        if index > saved_requests.len() {
-            return too_big(&saved_requests);
+    if utils::arg_is_number(&first_arg) {
+        let index = utils::convert_option_to_number(&first_arg);
+        if index > requests.len() {
+            return utils::too_big(&requests);
         }
-        let partial_url = get_url_from_saved_requests(&saved_requests, index);
-        full_url = get_url_with_https(&partial_url);
-    }
+        let request = utils::get_request_from_saved_requests(&requests, index);
 
-    let res = reqwest::get(full_url).await?;
-
-    println!("{}", res.status());
-
-    let content_type = get_content_type_from_header(res.headers());
-
-    if content_type == "application/json" {
-        let res_text = res.text().await?;
-        let json: Value = serde_json::from_str(&res_text).unwrap();
-
-        println!("{:#}", json);
+        make_request(&request).await?;
     } else {
-        println!("{}", res.text().await?);
+        let full_url = utils::get_url_with_https(&first_arg);
+        let res = reqwest::get(full_url).await?;
+
+        println!("{}", res.status());
+
+        let content_type = utils::get_content_type_from_header(res.headers());
+
+        if content_type == "application/json" {
+            let res_text = res.text().await?;
+            let json: Value = serde_json::from_str(&res_text).unwrap();
+
+            println!("{:#}", json);
+        } else {
+            println!("{}", res.text().await?);
+        }
     }
 
     Ok(())
