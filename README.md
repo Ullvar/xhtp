@@ -17,11 +17,33 @@ curl -LO https://xhtp-release.s3.eu-north-1.amazonaws.com/upgrade-xhtp.sh && chm
 <h3 align="center">
     Features
 </h3>
+
+Show help:
 ```
-    list/l - list all the urls in the config file
-    list/l (request number) - list all the details of a specific request 
-    edit/e - edit an request in the config file
-    delete/d - delete a url from the config file
-    global/g - manage all the global variables
-    help/h - show help
+xhtp help
+```
+
+List all the urls in the config file:
+```
+xthp list
+```
+
+List all the details of a specific request:
+```
+xhtp list <request number>
+```
+
+Open the requests config file in your editor:
+```
+xhtp edit
+```
+
+Manage all the global variables:
+```
+xhtp global
+```
+
+Delete a url from the config file:
+```
+xhtp delete
 ```

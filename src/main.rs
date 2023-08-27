@@ -179,7 +179,7 @@ async fn main() -> Result<(), reqwest::Error> {
         Do a simple GET request by passing a url as an argument, alternatively you can select one of the following options:
             list/l - list all the urls in the config file
             list/l (request number) - list all the details of a specific request 
-            edit/e - edit an request in the config file
+            edit/e - open the requests config file in your editor
             delete/d - delete a url from the config file
             global/g - manage all the global variables
             help/h - show help
