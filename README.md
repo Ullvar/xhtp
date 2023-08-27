@@ -15,7 +15,7 @@ curl -LO https://xhtp-release.s3.eu-north-1.amazonaws.com/upgrade-xhtp.sh && chm
 ```
 
 The requests config should look like this:
-`
+```json
 [
   {
     "method": "GET",
@@ -31,15 +31,15 @@ The requests config should look like this:
         "variable_name": "name"
       }
     ]
-  },
+  }
 ]
-`
+```
 
 The body_type must be one of `json | form | text`.
 The `extract_variables` will extract variables from a json response and save it as a global vaiable.
-Global variables can be used in any part of the request and should look like the {{access_token}} above.
+Global variables can be used in any part of the request and should look like the `{{access_token}}` above.
 
-<h3 align="center">
+<h3>
     Features
 </h3>
 
