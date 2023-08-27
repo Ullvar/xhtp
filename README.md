@@ -23,7 +23,7 @@ Show help:
 xhtp help
 ```
 
-Import an openapi spec and save the requests in the config file 
+Import an openapi spec and save the requests in the config file:
 ```
 xhtp import <path to openapi spec>
 ```
