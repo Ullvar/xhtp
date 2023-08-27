@@ -1,53 +1,37 @@
+use crate::utils::read_http_request_file;
 use clap::Parser;
 use serde_json::Value;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::Write;
+mod openapi_structs;
 mod structs;
 mod utils;
-use std::fs;
 
-fn read_http_request_file() -> Vec<structs::HttpRequest> {
-    if !File::open(utils::get_http_requests_file_path()).is_ok() {
-        if let Err(err) = fs::create_dir(format!("{}/.xhtp", utils::get_home_path())) {
-            eprintln!("Error creating directory: {}", err);
-        }
-        // File does not exist, create it
-        let mut file =
-            File::create(utils::get_http_requests_file_path()).expect("Failed to create file");
-        file.write_all("[]".as_bytes())
-            .expect("Failed to create file");
-    }
-    let file = File::open(utils::get_http_requests_file_path()).expect("Failed to open file");
-    let reader = BufReader::new(file);
-    let requests: Vec<structs::HttpRequest> =
-        serde_json::from_reader(reader).expect("Failed to parse JSON");
-    requests
+fn open_requests_file_in_editor() {
+    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+    let path = utils::get_http_requests_file_path();
+    let mut child = std::process::Command::new(editor)
+        .arg(path)
+        .spawn()
+        .expect("Failed to open file in editor");
+    let ecode = child.wait().expect("Failed to wait on child");
+    assert!(ecode.success());
 }
 
-fn save_to_global_variables(key: String, value: String) {
-    let mut global_variables = utils::get_global_variables();
-    let global_variable = structs::GlobalVariable { key, value };
-
-    if let Some(index) = global_variables
-        .iter()
-        .position(|x| x.key == global_variable.key)
-    {
-        global_variables[index] = global_variable;
-    } else {
-        global_variables.push(global_variable);
-    }
-
-    let mut file = File::create(utils::get_global_variables_file_path()).unwrap();
-    let json = serde_json::to_string(&global_variables).unwrap();
-    file.write_all(json.as_bytes()).unwrap();
+fn print_http_response_as_json(http_response: &structs::HttpResponse) {
+    let json_http_response = serde_json::to_string(&http_response).unwrap();
+    println!("{}", json_http_response);
 }
 
 async fn handle_response(
     req: &structs::HttpRequest,
     res: reqwest::Response,
 ) -> Result<(), reqwest::Error> {
-    println!("{}", res.status());
+    let mut http_response = structs::HttpResponse {
+        method: req.method.clone(),
+        url: req.url.clone(),
+        status_code: res.status().as_u16(),
+        json_data: None,
+        text_data: None,
+    };
 
     let content_type = utils::get_content_type_from_header(res.headers());
 
@@ -59,7 +43,10 @@ async fn handle_response(
             let extract_variables = req.extract_variables.as_ref().unwrap();
             for variable in extract_variables {
                 if let Some(value) = utils::get_json_value(&json, &variable.key_path) {
-                    save_to_global_variables(variable.variable_name.clone(), value.to_string());
+                    utils::save_to_global_variables(
+                        variable.variable_name.clone(),
+                        value.to_string(),
+                    );
                 } else {
                     println!(
                         "The key '{}' was not found in the JSON.",
@@ -68,10 +55,11 @@ async fn handle_response(
                 }
             }
         }
-
-        println!("{:#}", json);
+        http_response.json_data = Some(json.clone());
+        print_http_response_as_json(&http_response);
     } else {
-        println!("{}", res.text().await?);
+        http_response.text_data = Some(res.text().await?);
+        print_http_response_as_json(&http_response);
     }
 
     Ok(())
@@ -82,10 +70,10 @@ fn get_headers_from_vec(headers: &Vec<String>) -> reqwest::header::HeaderMap {
     for header in headers {
         let header_split: Vec<&str> = header.split(":").collect();
         let header_name = header_split[0];
-        let header_value = header_split[1];
+        let header_value = header_split[1].trim().replace("\"", "");
         header_map.insert(
             reqwest::header::HeaderName::from_bytes(header_name.as_bytes()).unwrap(),
-            reqwest::header::HeaderValue::from_str(header_value).unwrap(),
+            reqwest::header::HeaderValue::from_str(header_value.as_str()).unwrap(),
         );
     }
     header_map
@@ -115,13 +103,42 @@ async fn make_request(request: &structs::HttpRequest) -> Result<(), reqwest::Err
             .await?;
         handle_response(request, response).await?;
     } else if request.method == "POST" {
-        let response = reqwest::Client::new()
-            .post(&full_url)
-            .headers(get_headers_from_vec(&headers))
-            .json(&request.body)
-            .send()
-            .await?;
-        handle_response(request, response).await?;
+        if request.body_type.is_none() {
+            let response = reqwest::Client::new()
+                .post(&full_url)
+                .headers(get_headers_from_vec(&headers))
+                .send()
+                .await?;
+            handle_response(request, response).await?;
+            return Ok(());
+        } else if request.body_type.as_ref().unwrap() == "form" {
+            let response = reqwest::Client::new()
+                .post(&full_url)
+                .headers(get_headers_from_vec(&headers))
+                .form(&request.body)
+                .send()
+                .await?;
+            handle_response(request, response).await?;
+            return Ok(());
+        } else if request.body_type.as_ref().unwrap() == "json" {
+            let response = reqwest::Client::new()
+                .post(&full_url)
+                .headers(get_headers_from_vec(&headers))
+                .json(&request.body)
+                .send()
+                .await?;
+            handle_response(request, response).await?;
+            return Ok(());
+        } else if request.body_type.as_ref().unwrap() == "text" {
+            let response = reqwest::Client::new()
+                .post(&full_url)
+                .headers(get_headers_from_vec(&headers))
+                .body(request.body.as_ref().unwrap().to_string())
+                .send()
+                .await?;
+            handle_response(request, response).await?;
+            return Ok(());
+        }
     } else if request.method == "PUT" {
         let response = reqwest::Client::new()
             .put(&full_url)
@@ -162,8 +179,7 @@ async fn main() -> Result<(), reqwest::Error> {
         Do a simple GET request by passing a url as an argument, alternatively you can select one of the following options:
             list/l - list all the urls in the config file
             list/l (request number) - list all the details of a specific request 
-            add/a - add a new url to the config file
-            edit/e - edit a url in the config file
+            edit/e - edit an request in the config file
             delete/d - delete a url from the config file
             global/g - manage all the global variables
             help/h - show help
@@ -185,7 +201,8 @@ async fn main() -> Result<(), reqwest::Error> {
         }
         return Ok(());
     } else if first_arg == "add" || first_arg == "a" {
-        utils::handle_add(&mut requests);
+        //utils::handle_add(&mut requests);
+        open_requests_file_in_editor();
         return Ok(());
     } else if first_arg == "delete" || first_arg == "d" {
         let result = utils::handle_delete(&mut requests);
@@ -194,9 +211,15 @@ async fn main() -> Result<(), reqwest::Error> {
         }
         return Ok(());
     } else if first_arg == "edit" || first_arg == "e" {
+        open_requests_file_in_editor();
         return Ok(());
     } else if first_arg == "global" || first_arg == "g" {
         return utils::handle_global_variables();
+    } else if first_arg == "import" || first_arg == "i" {
+        utils::handle_open_api_sepc_import(&second_arg.as_ref().unwrap())
+            .await
+            .unwrap();
+        return Ok(());
     }
 
     if utils::arg_is_number(&first_arg) {

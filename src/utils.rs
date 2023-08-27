@@ -1,7 +1,8 @@
+use crate::openapi_structs::OpenAPI;
 use crate::structs::{ExtractVariable, GlobalVariable, HttpRequest};
 use dirs::home_dir;
 use serde_json::Value;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufReader, Write};
 
 pub fn get_home_path() -> String {
@@ -58,7 +59,7 @@ pub fn get_request_from_saved_requests(
     request
 }
 
-fn get_ansi_colored_request_method(method: &str) -> String {
+pub fn get_ansi_colored_request_method(method: &str) -> String {
     match method {
         "GET" => format!("\x1b[32m{}\x1b[0m", method),
         "POST" => format!("\x1b[33m{}\x1b[0m", method),
@@ -123,104 +124,130 @@ pub fn print_full_saved_request_from_index(saved_requests: &Vec<HttpRequest>, in
     }
 }
 
-pub fn handle_add(requests: &mut Vec<HttpRequest>) {
-    print("Enter the http request method: ");
-    std::io::stdout().flush().unwrap();
-    let mut method = String::new();
-    std::io::stdin().read_line(&mut method).unwrap();
-    method = method.trim().to_string();
-    method = method.to_uppercase();
-
-    let allowed_methods = vec!["GET", "POST", "PUT", "DELETE"];
-    if !allowed_methods.contains(&method.trim()) {
-        print_line("Invalid method, must be one of GET, POST, PUT, DELETE");
-        return;
-    }
-
-    print("Enter the url: ");
-    std::io::stdout().flush().unwrap();
-    let mut url = String::new();
-    std::io::stdin().read_line(&mut url).unwrap();
-    url = url.trim().to_string();
-
-    print_line("Enter the headers one by one. Input (s) to save when done");
-    let mut headers = Vec::new();
-    loop {
-        print("Enter the header: ");
-        std::io::stdout().flush().unwrap();
-        let mut header = String::new();
-        std::io::stdin().read_line(&mut header).unwrap();
-        header = header.trim().to_string();
-        if header == "s" {
-            break;
-        }
-        headers.push(header);
-    }
-
-    let mut body = Value::Null;
-    if method != "GET" && method != "DELETE" {
-        let mut string_body = String::new();
-        print("Enter the body: ");
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line(&mut string_body).unwrap();
-        body = serde_json::from_str(&string_body).unwrap();
-    }
-
-    let mut extract_variables = None;
-    print("Do you want to extract variables from the response? (y/n): ");
-    std::io::stdout().flush().unwrap();
-    let mut extract_variables_response = String::new();
-    std::io::stdin()
-        .read_line(&mut extract_variables_response)
-        .unwrap();
-    extract_variables_response = extract_variables_response.trim().to_string();
-
-    if extract_variables_response == "y" {
-        print_line(
-            "Enter the variables you want to extract one by one. Input (s) to save when done",
-        );
-        let mut variables = Vec::new();
-        loop {
-            print("Enter the name of the variable you want to save to: ");
-            std::io::stdout().flush().unwrap();
-            let mut variable = String::new();
-            std::io::stdin().read_line(&mut variable).unwrap();
-            variable = variable.trim().to_string();
-            if variable == "s" {
-                break;
-            }
-            let mut key_path = String::new();
-            print("Enter the key path: ");
-            std::io::stdout().flush().unwrap();
-            std::io::stdin().read_line(&mut key_path).unwrap();
-            key_path = key_path.trim().to_string();
-            let extract_variable = ExtractVariable {
-                key_path,
-                variable_name: variable,
-            };
-            variables.push(extract_variable);
-        }
-        extract_variables = Some(variables);
-    }
-
-    let request = HttpRequest {
-        method,
-        url,
-        headers,
-        body: Some(body),
-        extract_variables,
-    };
-
-    print_line("Saving request...");
-
-    requests.push(request);
-
-    let mut file = File::create(get_http_requests_file_path()).unwrap();
-
-    let json = serde_json::to_string(&requests).unwrap();
-
-    file.write_all(json.as_bytes()).unwrap();
-}
+//pub fn handle_add(requests: &mut Vec<HttpRequest>) {
+//    print("Enter the http request method: ");
+//    std::io::stdout().flush().unwrap();
+//    let mut method = String::new();
+//    std::io::stdin().read_line(&mut method).unwrap();
+//    method = method.trim().to_string();
+//    method = method.to_uppercase();
+//
+//    let allowed_methods = vec!["GET", "POST", "PUT", "DELETE"];
+//    if !allowed_methods.contains(&method.trim()) {
+//        print_line("Invalid method, must be one of GET, POST, PUT, DELETE");
+//        return;
+//    }
+//
+//    print("Enter the url: ");
+//    std::io::stdout().flush().unwrap();
+//    let mut url = String::new();
+//    std::io::stdin().read_line(&mut url).unwrap();
+//    url = url.trim().to_string();
+//
+//    print_line("Enter the headers one by one. Input (s) to save when done");
+//    let mut headers = Vec::new();
+//    loop {
+//        print("Enter the header: ");
+//        std::io::stdout().flush().unwrap();
+//        let mut header = String::new();
+//        std::io::stdin().read_line(&mut header).unwrap();
+//        header = header.trim().to_string();
+//        if header == "s" {
+//            break;
+//        }
+//        headers.push(header);
+//    }
+//
+//    let mut body = Value::Null;
+//    let mut body_type: Option<String> = None;
+//    if method != "GET" && method != "DELETE" {
+//        let mut string_body = String::new();
+//        print!("Enter the body type (json/form): ");
+//        std::io::stdout().flush().unwrap();
+//        std::io::stdin().read_line(&mut body_type).unwrap();
+//        body_type = body_type.trim().to_string();
+//        if body_type == "json" {
+//            print("Enter the body: ");
+//            std::io::stdout().flush().unwrap();
+//            std::io::stdin().read_line(&mut string_body).unwrap();
+//            body = serde_json::from_str(&string_body).unwrap();
+//        } else if body_type == "form" {
+//            print_line("Enter the form data one by one. Input (s) to save when done");
+//            let mut form_data = Vec::new();
+//            loop {
+//                print("Enter the form data: ");
+//                std::io::stdout().flush().unwrap();
+//                let mut form_data_input = String::new();
+//                std::io::stdin().read_line(&mut form_data_input).unwrap();
+//                form_data_input = form_data_input.trim().to_string();
+//                if form_data_input == "s" {
+//                    break;
+//                }
+//                form_data.push(form_data_input);
+//            }
+//            body = serde_json::from_str(&serde_json::to_string(&form_data).unwrap()).unwrap();
+//        } else {
+//            print_line("Invalid body type, must be one of json, form");
+//            return;
+//        }
+//    }
+//
+//    let mut extract_variables = None;
+//    print("Do you want to extract variables from the response? (y/n): ");
+//    std::io::stdout().flush().unwrap();
+//    let mut extract_variables_response = String::new();
+//    std::io::stdin()
+//        .read_line(&mut extract_variables_response)
+//        .unwrap();
+//    extract_variables_response = extract_variables_response.trim().to_string();
+//
+//    if extract_variables_response == "y" {
+//        print_line(
+//            "Enter the variables you want to extract one by one. Input (s) to save when done",
+//        );
+//        let mut variables = Vec::new();
+//        loop {
+//            print("Enter the name of the variable you want to save to: ");
+//            std::io::stdout().flush().unwrap();
+//            let mut variable = String::new();
+//            std::io::stdin().read_line(&mut variable).unwrap();
+//            variable = variable.trim().to_string();
+//            if variable == "s" {
+//                break;
+//            }
+//            let mut key_path = String::new();
+//            print("Enter the key path: ");
+//            std::io::stdout().flush().unwrap();
+//            std::io::stdin().read_line(&mut key_path).unwrap();
+//            key_path = key_path.trim().to_string();
+//            let extract_variable = ExtractVariable {
+//                key_path,
+//                variable_name: variable,
+//            };
+//            variables.push(extract_variable);
+//        }
+//        extract_variables = Some(variables);
+//    }
+//
+//    let request = HttpRequest {
+//        method,
+//        url,
+//        headers,
+//        body_type,
+//        body: Some(body),
+//        extract_variables,
+//    };
+//
+//    print_line("Saving request...");
+//
+//    requests.push(request);
+//
+//    let mut file = File::create(get_http_requests_file_path()).unwrap();
+//
+//    let json = serde_json::to_string(&requests).unwrap();
+//
+//    file.write_all(json.as_bytes()).unwrap();
+//}
 
 pub fn handle_delete(requests: &mut Vec<HttpRequest>) -> Result<(), Box<dyn std::error::Error>> {
     print_saved_requests(&requests);
@@ -270,8 +297,25 @@ pub fn get_global_variables() -> Vec<GlobalVariable> {
     global_variables
 }
 
-fn add_global_variable() -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_to_global_variables(key: String, value: String) {
     let mut global_variables = get_global_variables();
+    let global_variable = GlobalVariable { key, value };
+
+    if let Some(index) = global_variables
+        .iter()
+        .position(|x| x.key == global_variable.key)
+    {
+        global_variables[index] = global_variable;
+    } else {
+        global_variables.push(global_variable);
+    }
+
+    let mut file = File::create(get_global_variables_file_path()).unwrap();
+    let json = serde_json::to_string(&global_variables).unwrap();
+    file.write_all(json.as_bytes()).unwrap();
+}
+
+fn add_global_variable() -> Result<(), Box<dyn std::error::Error>> {
     print("Enter the name of the variable: ");
     std::io::stdout().flush().unwrap();
     let mut name = String::new();
@@ -284,13 +328,7 @@ fn add_global_variable() -> Result<(), Box<dyn std::error::Error>> {
     std::io::stdin().read_line(&mut value).unwrap();
     value = value.trim().to_string();
 
-    let global_variable = GlobalVariable { key: name, value };
-    global_variables.push(global_variable);
-
-    let json = serde_json::to_string(&global_variables)?;
-
-    let mut file = File::create(get_global_variables_file_path())?;
-    file.write_all(json.as_bytes())?;
+    save_to_global_variables(name.clone(), value.clone());
 
     return Ok(());
 }
@@ -326,7 +364,7 @@ pub fn handle_global_variables() -> Result<(), reqwest::Error> {
         );
     }
 
-    print_line("Select (a) to add a variable, (d) to delete a variable");
+    print_line("Select (a) to add a variable, (d) to delete a variable, or (q) to quit");
     print("Enter your choice: ");
     std::io::stdout().flush().unwrap();
     let mut choice = String::new();
@@ -356,4 +394,188 @@ pub fn handle_global_variables() -> Result<(), reqwest::Error> {
     } else {
         return Ok(());
     }
+}
+
+pub fn map_open_api_spec_to_http_requests(base_url: &str, open_api: OpenAPI) -> Vec<HttpRequest> {
+    let mut requests = Vec::new();
+    for (path, path_item) in open_api.paths {
+        if path_item.get.is_some() {
+            let mut url = format!("{}{}", base_url, path);
+            let mut parameters = None;
+
+            let operation = path_item.get.unwrap();
+            if operation.parameters.is_some() {
+                parameters = operation.parameters;
+            }
+            if parameters.is_some() {
+                for parameter in parameters.unwrap() {
+                    if parameter.required.is_some() && parameter.required.unwrap() {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "1");
+                    } else {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "0");
+                    }
+                }
+            }
+            let request = HttpRequest {
+                method: "GET".to_string(),
+                url,
+                headers: Vec::new(),
+                body_type: None,
+                body: None,
+                extract_variables: None,
+            };
+            requests.push(request);
+        }
+
+        if path_item.post.is_some() {
+            let mut url = format!("{}{}", base_url, path);
+            let mut parameters = None;
+
+            let operation = path_item.post.unwrap();
+            if operation.parameters.is_some() {
+                parameters = operation.parameters;
+            }
+            if parameters.is_some() {
+                for parameter in parameters.unwrap() {
+                    if parameter.required.is_some() && parameter.required.unwrap() {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "1");
+                    } else {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "0");
+                    }
+                }
+            }
+            let request = HttpRequest {
+                method: "POST".to_string(),
+                url,
+                headers: Vec::new(),
+                body_type: None,
+                body: None,
+                extract_variables: None,
+            };
+            requests.push(request);
+        }
+
+        if path_item.put.is_some() {
+            let mut url = format!("{}{}", base_url, path);
+            let mut parameters = None;
+
+            let operation = path_item.put.unwrap();
+            if operation.parameters.is_some() {
+                parameters = operation.parameters;
+            }
+            if parameters.is_some() {
+                for parameter in parameters.unwrap() {
+                    if parameter.required.is_some() && parameter.required.unwrap() {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "1");
+                    } else {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "0");
+                    }
+                }
+            }
+            let request = HttpRequest {
+                method: "PUT".to_string(),
+                url,
+                headers: Vec::new(),
+                body_type: None,
+                body: None,
+                extract_variables: None,
+            };
+            requests.push(request);
+        }
+
+        if path_item.delete.is_some() {
+            let mut url = format!("{}{}", base_url, path);
+            let mut parameters = None;
+
+            let operation = path_item.delete.unwrap();
+            if operation.parameters.is_some() {
+                parameters = operation.parameters;
+            }
+            if parameters.is_some() {
+                for parameter in parameters.unwrap() {
+                    if parameter.required.is_some() && parameter.required.unwrap() {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "1");
+                    } else {
+                        url = url.replace(&format!("{{{}}}", parameter.name), "0");
+                    }
+                }
+            }
+            let request = HttpRequest {
+                method: "DELETE".to_string(),
+                url,
+                headers: Vec::new(),
+                body_type: None,
+                body: None,
+                extract_variables: None,
+            };
+            requests.push(request);
+        }
+    }
+    return requests;
+}
+
+pub fn read_http_request_file() -> Vec<HttpRequest> {
+    if !File::open(get_http_requests_file_path()).is_ok() {
+        if let Err(err) = fs::create_dir(format!("{}/.xhtp", get_home_path())) {
+            eprintln!("Error creating directory: {}", err);
+        }
+        // File does not exist, create it
+        let mut file = File::create(get_http_requests_file_path()).expect("Failed to create file");
+        file.write_all("[]".as_bytes())
+            .expect("Failed to create file");
+    }
+    let file = File::open(get_http_requests_file_path()).expect("Failed to open file");
+    let reader = BufReader::new(file);
+    let requests: Vec<HttpRequest> = serde_json::from_reader(reader).expect("Failed to parse JSON");
+    requests
+}
+
+pub fn merge_requests(
+    saved_requests: &Vec<HttpRequest>,
+    imported_requests: &Vec<HttpRequest>,
+) -> Vec<HttpRequest> {
+    let mut merged_requests = saved_requests.clone();
+
+    for imported_request in imported_requests {
+        if !merged_requests.contains(imported_request) {
+            merged_requests.push(HttpRequest {
+                method: imported_request.method.clone(),
+                url: imported_request.url.clone(),
+                headers: imported_request.headers.clone(),
+                body_type: imported_request.body_type.clone(),
+                body: imported_request.body.clone(),
+                extract_variables: None,
+            });
+        }
+    }
+
+    return merged_requests;
+}
+
+pub async fn handle_open_api_sepc_import(spec_url: &str) -> Result<(), reqwest::Error> {
+    let base_url = spec_url.split("/").collect::<Vec<&str>>()[0..3].join("/");
+    println!("{}", base_url);
+    let spec_url = get_url_with_https(spec_url);
+    let spec = reqwest::get(spec_url).await?.text().await?;
+    let spec: OpenAPI = serde_json::from_str(&spec).unwrap();
+    let imported_requests = map_open_api_spec_to_http_requests(&base_url, spec);
+    let saved_requests = read_http_request_file();
+
+    let merged_requests = merge_requests(&saved_requests, &imported_requests);
+
+    print_line("Saving requests...");
+
+    let json = serde_json::to_string(&merged_requests).unwrap();
+
+    print_line("Created json");
+
+    let mut file = File::create(get_http_requests_file_path()).unwrap();
+
+    print_line("Created file");
+
+    file.write_all(json.as_bytes()).unwrap();
+
+    print_line("Wrote to file");
+
+    return Ok(());
 }
