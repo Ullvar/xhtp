@@ -57,3 +57,6 @@ Delete a url from the config file:
 ```
 xhtp delete
 ```
+
+
+Works well together with [jq](https://jqlang.github.io/jq) for processing responses. 
