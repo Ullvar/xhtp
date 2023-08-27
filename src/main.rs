@@ -177,8 +177,9 @@ async fn main() -> Result<(), reqwest::Error> {
             "
         Usage: 
         Do a simple GET request by passing a url as an argument, alternatively you can select one of the following options:
+            import/i <path to openapi spec> - import an openapi spec and save the requests in the config file 
             list/l - list all the urls in the config file
-            list/l (request number) - list all the details of a specific request 
+            list/l <request number> - list all the details of a specific request 
             edit/e - open the requests config file in your editor
             delete/d - delete a url from the config file
             global/g - manage all the global variables
