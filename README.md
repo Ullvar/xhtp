@@ -1,5 +1,5 @@
 <h2 align="center">
-        <img height="100" alt="xhtp" src="" />
+        <img height="100" alt="xhtp" src="https://github.com/Ullvar/xhtp/blob/master/docs/xhtp-logo.svg" />
     <br>
     xhtp CLI: Simple and fast HTTP client for the terminal
 </h2>
