@@ -565,7 +565,7 @@ pub async fn handle_open_api_sepc_import(spec_url: &str) -> Result<(), reqwest::
 
     print_line("Saving requests...");
 
-    let json = serde_json::to_string(&merged_requests).unwrap();
+    let json = serde_json::to_string_pretty(&merged_requests).unwrap();
 
     print_line("Created json");
 
