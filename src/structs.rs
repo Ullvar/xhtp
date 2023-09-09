@@ -6,6 +6,7 @@ use serde_json::Value;
 pub struct Cli {
     pub first_arg: Option<String>,
     pub second_arg: Option<String>,
+    pub third_arg: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]

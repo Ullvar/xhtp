@@ -177,13 +177,15 @@ async fn main() -> Result<(), reqwest::Error> {
             "
         Usage: 
         Do a simple GET request by passing a url as an argument, alternatively you can select one of the following options:
-            import/i <path to openapi spec> - import an openapi spec and save the requests in the config file 
-            list/l - list all the urls in the config file
-            list/l <request number> - list all the details of a specific request 
-            edit/e - open the requests config file in your editor
-            delete/d - delete a url from the config file
-            global/g - manage all the global variables
-            help/h - show help
+            i <path to openapi spec> - import an openapi spec and save the requests in the config file 
+            l - list all the urls in the config file
+            l <request number> - list all the details of a specific request 
+            e - open the requests config file in your editor
+            d - delete a url from the config file
+            gl - list all the global variables
+            ga <variable name> <variable value> - add a global variable
+            gd <variable name> - delete a global variable
+            h - show help
         "
         );
         return Ok(());
@@ -191,8 +193,9 @@ async fn main() -> Result<(), reqwest::Error> {
 
     let first_arg = args.first_arg.as_ref().unwrap();
     let second_arg = args.second_arg.as_ref();
+    let third_arg = args.third_arg.as_ref();
 
-    if first_arg == "list" || first_arg == "l" {
+    if first_arg == "l" {
         if second_arg.is_some() && utils::arg_is_number(&second_arg.as_ref().unwrap()) {
             let index = second_arg.as_ref().unwrap().parse::<usize>().unwrap();
             utils::print_full_saved_request_from_index(&requests, index)
@@ -201,22 +204,33 @@ async fn main() -> Result<(), reqwest::Error> {
             utils::print_saved_requests(&requests);
         }
         return Ok(());
-    } else if first_arg == "add" || first_arg == "a" {
-        //utils::handle_add(&mut requests);
+    } else if first_arg == "a" {
         open_requests_file_in_editor();
         return Ok(());
-    } else if first_arg == "delete" || first_arg == "d" {
+    } else if first_arg == "d" {
         let result = utils::handle_delete(&mut requests);
         if result.is_err() {
             return utils::too_big(&requests);
         }
         return Ok(());
-    } else if first_arg == "edit" || first_arg == "e" {
+    } else if first_arg == "e" {
         open_requests_file_in_editor();
         return Ok(());
-    } else if first_arg == "global" || first_arg == "g" {
-        return utils::handle_global_variables();
-    } else if first_arg == "import" || first_arg == "i" {
+    } else if first_arg == "gl" && second_arg.is_none() {
+        utils::list_global_variables();
+        return Ok(());
+    } else if first_arg == "ga" && second_arg.is_some() && third_arg.is_some() {
+        let name = second_arg.as_ref().unwrap().to_string();
+        let value = third_arg.as_ref().unwrap().to_string();
+        utils::save_to_global_variables(name, value);
+        utils::list_global_variables();
+        return Ok(());
+    } else if first_arg == "gd" && second_arg.is_some() && third_arg.is_none() {
+        let index_str = second_arg.as_ref().unwrap().to_string();
+        utils::delete_global_variable(index_str);
+        utils::list_global_variables();
+        return Ok(());
+    } else if first_arg == "i" {
         utils::handle_open_api_sepc_import(&second_arg.as_ref().unwrap())
             .await
             .unwrap();

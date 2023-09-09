@@ -124,131 +124,6 @@ pub fn print_full_saved_request_from_index(saved_requests: &Vec<HttpRequest>, in
     }
 }
 
-//pub fn handle_add(requests: &mut Vec<HttpRequest>) {
-//    print("Enter the http request method: ");
-//    std::io::stdout().flush().unwrap();
-//    let mut method = String::new();
-//    std::io::stdin().read_line(&mut method).unwrap();
-//    method = method.trim().to_string();
-//    method = method.to_uppercase();
-//
-//    let allowed_methods = vec!["GET", "POST", "PUT", "DELETE"];
-//    if !allowed_methods.contains(&method.trim()) {
-//        print_line("Invalid method, must be one of GET, POST, PUT, DELETE");
-//        return;
-//    }
-//
-//    print("Enter the url: ");
-//    std::io::stdout().flush().unwrap();
-//    let mut url = String::new();
-//    std::io::stdin().read_line(&mut url).unwrap();
-//    url = url.trim().to_string();
-//
-//    print_line("Enter the headers one by one. Input (s) to save when done");
-//    let mut headers = Vec::new();
-//    loop {
-//        print("Enter the header: ");
-//        std::io::stdout().flush().unwrap();
-//        let mut header = String::new();
-//        std::io::stdin().read_line(&mut header).unwrap();
-//        header = header.trim().to_string();
-//        if header == "s" {
-//            break;
-//        }
-//        headers.push(header);
-//    }
-//
-//    let mut body = Value::Null;
-//    let mut body_type: Option<String> = None;
-//    if method != "GET" && method != "DELETE" {
-//        let mut string_body = String::new();
-//        print!("Enter the body type (json/form): ");
-//        std::io::stdout().flush().unwrap();
-//        std::io::stdin().read_line(&mut body_type).unwrap();
-//        body_type = body_type.trim().to_string();
-//        if body_type == "json" {
-//            print("Enter the body: ");
-//            std::io::stdout().flush().unwrap();
-//            std::io::stdin().read_line(&mut string_body).unwrap();
-//            body = serde_json::from_str(&string_body).unwrap();
-//        } else if body_type == "form" {
-//            print_line("Enter the form data one by one. Input (s) to save when done");
-//            let mut form_data = Vec::new();
-//            loop {
-//                print("Enter the form data: ");
-//                std::io::stdout().flush().unwrap();
-//                let mut form_data_input = String::new();
-//                std::io::stdin().read_line(&mut form_data_input).unwrap();
-//                form_data_input = form_data_input.trim().to_string();
-//                if form_data_input == "s" {
-//                    break;
-//                }
-//                form_data.push(form_data_input);
-//            }
-//            body = serde_json::from_str(&serde_json::to_string(&form_data).unwrap()).unwrap();
-//        } else {
-//            print_line("Invalid body type, must be one of json, form");
-//            return;
-//        }
-//    }
-//
-//    let mut extract_variables = None;
-//    print("Do you want to extract variables from the response? (y/n): ");
-//    std::io::stdout().flush().unwrap();
-//    let mut extract_variables_response = String::new();
-//    std::io::stdin()
-//        .read_line(&mut extract_variables_response)
-//        .unwrap();
-//    extract_variables_response = extract_variables_response.trim().to_string();
-//
-//    if extract_variables_response == "y" {
-//        print_line(
-//            "Enter the variables you want to extract one by one. Input (s) to save when done",
-//        );
-//        let mut variables = Vec::new();
-//        loop {
-//            print("Enter the name of the variable you want to save to: ");
-//            std::io::stdout().flush().unwrap();
-//            let mut variable = String::new();
-//            std::io::stdin().read_line(&mut variable).unwrap();
-//            variable = variable.trim().to_string();
-//            if variable == "s" {
-//                break;
-//            }
-//            let mut key_path = String::new();
-//            print("Enter the key path: ");
-//            std::io::stdout().flush().unwrap();
-//            std::io::stdin().read_line(&mut key_path).unwrap();
-//            key_path = key_path.trim().to_string();
-//            let extract_variable = ExtractVariable {
-//                key_path,
-//                variable_name: variable,
-//            };
-//            variables.push(extract_variable);
-//        }
-//        extract_variables = Some(variables);
-//    }
-//
-//    let request = HttpRequest {
-//        method,
-//        url,
-//        headers,
-//        body_type,
-//        body: Some(body),
-//        extract_variables,
-//    };
-//
-//    print_line("Saving request...");
-//
-//    requests.push(request);
-//
-//    let mut file = File::create(get_http_requests_file_path()).unwrap();
-//
-//    let json = serde_json::to_string(&requests).unwrap();
-//
-//    file.write_all(json.as_bytes()).unwrap();
-//}
-
 pub fn handle_delete(requests: &mut Vec<HttpRequest>) -> Result<(), Box<dyn std::error::Error>> {
     print_saved_requests(&requests);
     print("Select the number of the request you want to delete: ");
@@ -315,44 +190,19 @@ pub fn save_to_global_variables(key: String, value: String) {
     file.write_all(json.as_bytes()).unwrap();
 }
 
-fn add_global_variable() -> Result<(), Box<dyn std::error::Error>> {
-    print("Enter the name of the variable: ");
-    std::io::stdout().flush().unwrap();
-    let mut name = String::new();
-    std::io::stdin().read_line(&mut name).unwrap();
-    name = name.trim().to_string();
-
-    print("Enter the value of the variable: ");
-    std::io::stdout().flush().unwrap();
-    let mut value = String::new();
-    std::io::stdin().read_line(&mut value).unwrap();
-    value = value.trim().to_string();
-
-    save_to_global_variables(name.clone(), value.clone());
-
-    return Ok(());
-}
-
-fn delete_global_variable() -> Result<(), Box<dyn std::error::Error>> {
+pub fn delete_global_variable(index_str: String) {
     let mut global_variables = get_global_variables();
-    print("Enter the number of the variable you want to delete: ");
-    std::io::stdout().flush().unwrap();
-    let mut index_str = String::new();
-    std::io::stdin().read_line(&mut index_str).unwrap();
-    index_str = index_str.trim().to_string();
 
     let index = convert_option_to_number(&index_str);
     global_variables.remove(index - 1);
 
-    let json = serde_json::to_string(&global_variables)?;
+    let json = serde_json::to_string(&global_variables).unwrap();
 
-    let mut file = File::create(get_global_variables_file_path())?;
-    file.write_all(json.as_bytes())?;
-
-    return Ok(());
+    let mut file = File::create(get_global_variables_file_path()).unwrap();
+    file.write_all(json.as_bytes()).unwrap();
 }
 
-pub fn handle_global_variables() -> Result<(), reqwest::Error> {
+pub fn list_global_variables() {
     let global_variables = get_global_variables();
     print_line("Here are your global variables:");
     for (index, global_variable) in global_variables.iter().enumerate() {
@@ -363,38 +213,40 @@ pub fn handle_global_variables() -> Result<(), reqwest::Error> {
             global_variable.value
         );
     }
-
-    print_line("Select (a) to add a variable, (d) to delete a variable, or (q) to quit");
-    print("Enter your choice: ");
-    std::io::stdout().flush().unwrap();
-    let mut choice = String::new();
-    std::io::stdin().read_line(&mut choice).unwrap();
-    choice = choice.trim().to_string();
-
-    if choice == "a" {
-        let res = add_global_variable();
-        if res.is_err() {
-            print_line("Failed to add global variable: ");
-            println!("{}", res.err().unwrap());
-            return Ok(());
-        } else {
-            print_line("Successfully added global variable!");
-            return Ok(());
-        }
-    } else if choice == "d" {
-        let res = delete_global_variable();
-        if res.is_err() {
-            print("Failed to delete global variable: ");
-            println!("{}", res.err().unwrap());
-            return Ok(());
-        } else {
-            print_line("Successfully deleted global variable!");
-            return Ok(());
-        }
-    } else {
-        return Ok(());
-    }
 }
+
+//pub fn handle_global_variables() -> Result<(), reqwest::Error> {
+//    print_line("Select (a) to add a variable, (d) to delete a variable, or (q) to quit");
+//    print("Enter your choice: ");
+//    std::io::stdout().flush().unwrap();
+//    let mut choice = String::new();
+//    std::io::stdin().read_line(&mut choice).unwrap();
+//    choice = choice.trim().to_string();
+//
+//    if choice == "a" {
+//        let res = add_global_variable();
+//        if res.is_err() {
+//            print_line("Failed to add global variable: ");
+//            println!("{}", res.err().unwrap());
+//            return Ok(());
+//        } else {
+//            print_line("Successfully added global variable!");
+//            return Ok(());
+//        }
+//    } else if choice == "d" {
+//        let res = delete_global_variable();
+//        if res.is_err() {
+//            print("Failed to delete global variable: ");
+//            println!("{}", res.err().unwrap());
+//            return Ok(());
+//        } else {
+//            print_line("Successfully deleted global variable!");
+//            return Ok(());
+//        }
+//    } else {
+//        return Ok(());
+//    }
+//}
 
 pub fn map_open_api_spec_to_http_requests(base_url: &str, open_api: OpenAPI) -> Vec<HttpRequest> {
     let mut requests = Vec::new();

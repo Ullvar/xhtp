@@ -43,9 +43,9 @@ Global variables can be used in any part of the request and should look like the
     Features
 </h3>
 
-Show help (shorthand `h`):
+Show help:
 ```
-xhtp help
+xhtp h
 ```
 
 Simple GET request:
@@ -53,35 +53,45 @@ Simple GET request:
 xhtp <url>
 ```
 
-Import an openapi spec and save the requests in the config file (shorthand `i`):
+Import an openapi spec and save the requests in the config file:
 ```
-xhtp import <path to openapi spec>
-```
-
-List all the urls in the config file (shorthand `l`):
-```
-xthp list
+xhtp i <path to openapi spec>
 ```
 
-List all the details of a specific request (shorthand `l`):
+List all the urls in the config file:
 ```
-xhtp list <request number>
+xthp l
 ```
 
-Open the requests config file in your editor (shorthand `e`):
+List all the details of a specific request:
 ```
-xhtp edit
+xhtp l <request number>
+```
+
+Open the requests config file in your editor:
+```
+xhtp e
 ```
 Will use the EDITOR variable if set, else `vi`
 
-Manage all the global variables (shorthand `g`):
+List all the global variables:
 ```
-xhtp global
+xhtp gl
 ```
 
-Delete a url from the config file (shorthand `d`):
+Add or override a global variable:
 ```
-xhtp delete
+xhtp ga <variable name> <variable value>
+```
+
+Delete a global variable:
+```
+xhtp gd <variable number>
+```
+
+Delete a url from the config file:
+```
+xhtp d
 ```
 
 
