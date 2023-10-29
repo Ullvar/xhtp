@@ -57,6 +57,8 @@ async fn handle_response(
         }
         http_response.json_data = Some(json.clone());
         print_http_response_as_json(&http_response);
+    } else if res.status().as_u16() == 204 {
+        println!("204 No Content")
     } else {
         http_response.text_data = Some(res.text().await?);
         print_http_response_as_json(&http_response);
