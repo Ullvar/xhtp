@@ -91,25 +91,12 @@ fn get_extract_variables_list(extract_variables: &Option<Vec<ExtractVariable>>) 
 }
 
 pub fn print_saved_requests(saved_requests: &Vec<HttpRequest>) {
-    let midpoint = saved_requests.len() / 2;
-
-    let (column1, column2) = saved_requests.split_at(midpoint);
-
-    let max_width = column1.iter().map(|s| s.url.len()).max().unwrap_or(0);
-
-    for (index, (item1, item2)) in column1.iter().zip(column2.iter()).enumerate() {
+    for (index, request) in saved_requests.iter().enumerate() {
         println!(
-            "{} {} {:<width$} | {} {} {}",
+            "{}: {} {}",
             index + 1,
-            get_ansi_colored_request_method(item1.method.as_str()),
-            item1.url,
-            index + 1 + midpoint,
-            get_ansi_colored_request_method(item2.method.as_str()),
-            item2.url,
-            width = max_width + 10
-                - item1.method.as_str().len()
-                - 3
-                - (if index + 1 >= 10 { 1 } else { 0 })
+            get_ansi_colored_request_method(request.method.as_str()),
+            request.url,
         );
     }
 }
