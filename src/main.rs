@@ -1,19 +1,54 @@
 use crate::utils::read_http_request_file;
 use clap::Parser;
 use serde_json::Value;
+use std::fs::{self, File};
 mod openapi_structs;
 mod structs;
 mod utils;
+use std::io::Write;
+use std::process::{Command, ExitStatus};
 
-fn open_requests_file_in_editor() {
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-    let path = utils::get_http_requests_file_path();
-    let mut child = std::process::Command::new(editor)
-        .arg(path)
-        .spawn()
-        .expect("Failed to open file in editor");
-    let ecode = child.wait().expect("Failed to wait on child");
-    assert!(ecode.success());
+fn open_requests_file_in_editor(request_index: &Option<&String>) {
+    if request_index.is_some() {
+        let index = request_index.unwrap().parse::<usize>().unwrap();
+        let requests = read_http_request_file();
+        let request = utils::get_request_from_saved_requests(&requests, index);
+        let temp_file_path = "xhtp_tmp.json";
+        fs::write(
+            temp_file_path,
+            serde_json::to_string_pretty(request).unwrap(),
+        )
+        .expect("Failed to create temporary file.");
+
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+        let _status: ExitStatus = Command::new(editor)
+            .arg(temp_file_path)
+            .status()
+            .expect("Failed to open the editor.");
+
+        let edited_content =
+            fs::read_to_string(temp_file_path).expect("Failed to read the edited file.");
+
+        fs::remove_file(temp_file_path).expect("Failed to remove the temporary file.");
+
+        let mut requests = read_http_request_file();
+        requests[index - 1] = serde_json::from_str(&edited_content).unwrap();
+
+        let json = serde_json::to_string_pretty(&requests).unwrap();
+
+        let mut file = File::create(utils::get_http_requests_file_path()).unwrap();
+
+        file.write_all(json.as_bytes()).unwrap();
+    } else {
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+        let path = utils::get_http_requests_file_path();
+        let mut child = std::process::Command::new(editor)
+            .arg(path)
+            .spawn()
+            .expect("Failed to open file in editor");
+        let ecode = child.wait().expect("Failed to wait on child");
+        assert!(ecode.success());
+    }
 }
 
 fn print_http_response_as_json(http_response: &structs::HttpResponse) {
@@ -207,7 +242,7 @@ async fn main() -> Result<(), reqwest::Error> {
         }
         return Ok(());
     } else if first_arg == "a" {
-        open_requests_file_in_editor();
+        open_requests_file_in_editor(&None);
         return Ok(());
     } else if first_arg == "d" {
         let result = utils::handle_delete(&mut requests);
@@ -216,7 +251,7 @@ async fn main() -> Result<(), reqwest::Error> {
         }
         return Ok(());
     } else if first_arg == "e" {
-        open_requests_file_in_editor();
+        open_requests_file_in_editor(&second_arg);
         return Ok(());
     } else if first_arg == "gl" && second_arg.is_none() {
         utils::list_global_variables();
